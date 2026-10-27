@@ -28,7 +28,7 @@ def patch_correlations_1d(spectrum, L, dmax):
     return rho
 
 def _cyclic_window_sum(values: np.ndarray, window: int) -> np.ndarray:
-    """sum of `window` consecutive cyclic values, for every start index."""
+    """sum of window consecutive cyclic values, for every start index."""
     values = np.asarray(values)
     n = values.size
     if not (1 <= window <= n):
@@ -53,8 +53,8 @@ def _correlation_axis(
 
     The raw patch inner-products for all shifts are computed using FFTs.
     Patch sums and energies for mean-centering are computed with cyclic
-    sliding sums. This is the fast 2D equivalent of applying pcc_complex to
-    each patch pair independently.
+    sliding sums (prefix sums). This is the fast 2D equivalent of applying pcc_complex 
+    (used in the implementation of 1D) to each patch pair independently.
     """
     F = np.asarray(spectrum, dtype=np.complex128)
     H, W = F.shape
@@ -146,6 +146,99 @@ def _correlation_axis(
         raise ValueError("axis must be 0 (vertical) or 1 (horizontal)")
 
     return rho
+
+def patch_correlations_2d(
+    spectrum: np.ndarray,
+    patch_shape: tuple[int, int] | None = None,
+    patch_ratio: int = 10,
+    eps: float = 1e-12,
+) -> tuple[np.ndarray, np.ndarray, tuple[int, int]]:
+    """Compute vertical and horizontal 2D spectral-patch correlations.
+
+    Parameters
+    ----------
+    spectrum:
+        Complex 2D spectrum of shape (H, W), normally the FFT of an image
+        residual. Do not pass an RGB image directly.
+    patch_shape:
+        Optional explicit (patch_height, patch_width). If omitted, use
+        (H // patch_ratio, W // patch_ratio), preserving the spectrum ratio.
+    patch_ratio:
+        Defaults to 10.
+    eps:
+        Small value to avoid division by zero for constant patches.
+
+    Returns
+    -------
+    rho_vertical:
+        Shape (number_patch_rows, number_patch_cols, H), for d=0,...,H-1.
+    rho_horizontal:
+        Shape (number_patch_rows, number_patch_cols, W), for d=0,...,W-1.
+    actual_patch_shape:
+        The (height, width) used. Remainder rows/columns that don't fit a full
+        anchor patch are not used as anchors, matching the non-overlapping grid.
+    
+    """
+    F = np.asarray(spectrum, dtype=np.complex128)
+    if F.ndim != 2:
+        raise ValueError("spectrum must be a 2D array")
+    H, W = F.shape
+    if not np.all(np.isfinite(F)):
+        raise ValueError("spectrum contains NaN or infinite values")
+    if patch_shape is None:
+        h = max(1, H // patch_ratio)
+        w = max(1, W // patch_ratio)
+    if h < 1 or w < 1 or h > H or w > W:
+        raise ValueError("patch dimensions must be positive and fit within the spectrum")
+
+    rv = _correlation_axis(F, (h, w), axis=0, eps=eps)
+    rh = _correlation_axis(F, (h, w), axis=1, eps=eps)
+    return rv, rh, (h, w)
+
+def tv_denoise(image, weight=0.08, iterations=100):
+    """TV denoiser for a 2-D grayscale image normalized to [0, 1]."""
+    f = np.asarray(image, dtype=np.float64)
+    if f.ndim != 2:
+        raise ValueError("Expected a 2-D grayscale image")
+    if weight < 0 or iterations < 1:
+        raise ValueError("weight must be >= 0 and iterations must be >= 1")
+    if weight == 0:
+        return f.copy()
+
+    u = f.copy()
+    u_bar = u.copy()
+    px = np.zeros_like(f)  # horizontal dual variable
+    py = np.zeros_like(f)  # vertical dual variable
+    tau = sigma = 0.25
+
+    for _ in range(iterations):
+        # Forward image gradients.
+        gx = np.zeros_like(f)
+        gy = np.zeros_like(f)
+        gx[:, :-1] = u_bar[:, 1:] - u_bar[:, :-1]
+        gy[:-1, :] = u_bar[1:, :] - u_bar[:-1, :]
+
+        # Update dual variables and project them onto the TV constraint ball.
+        px += sigma * gx
+        py += sigma * gy
+        norm = np.sqrt(px**2 + py**2)
+        scale = np.maximum(1.0, norm / weight)
+        px /= scale
+        py /= scale
+
+        # Divergence of the dual variables.
+        div = np.zeros_like(f)
+        div[:, 0] = px[:, 0]
+        div[:, 1:] += px[:, 1:] - px[:, :-1]
+        div[0, :] += py[0, :]
+        div[1:, :] += py[1:, :] - py[:-1, :]
+
+        # Data-fidelity update (Rudin-Osher-Fatemi TV model).
+        u_next = (u + tau * div + tau * f) / (1.0 + tau)
+        u_bar = 2.0 * u_next - u
+        u = u_next
+
+    return np.clip(u, 0.0, 1.0)
 
 
 
