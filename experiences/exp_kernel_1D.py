@@ -2,7 +2,7 @@ import sys,os
 sys.path.insert(0,os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import matplotlib.pyplot as plt
-from src.resampling import resample_1d, kernel_nn, linear_kernel
+from src.resampling import resample_1d, kernel_nn, linear_kernel, cubic_kernel, lanczos_kernel
 from src.dft import dft
 from src.spectral import patch_correlations_1d
 from src.acontrario import compute_nfa
@@ -12,15 +12,18 @@ rng=np.random.default_rng(0)
 M,N,L,r=100,250,8,20
 dmax=N-1
 d_pic=M%N
-kernels={"plus proche voisin":kernel_nn,"lineaire":linear_kernel}
+kernels={"plus proche voisin":kernel_nn,
+         "lineaire":linear_kernel,
+         "cubique":cubic_kernel,
+         "lanczos":lanczos_kernel}
 u=rng.standard_normal(M)
 
 # panneaux : une courbe NFA(d) par noyau + un bar chart du NFA au pic
-fig,ax=plt.subplots(1,2,figsize=(13,5))
+fig,ax=plt.subplots(1,2,figsize=(14,5))
 
 nfa_au_pic={}
 d=np.arange(N)
-for i,(nom,ker) in enumerate(kernels.items()):
+for nom,ker in kernels.items():
     v=resample_1d(u,N,ker)
     rho=patch_correlations_1d(dft(v),L,dmax)
     nfa=compute_nfa(rho,r)
@@ -40,9 +43,10 @@ ax[0].legend(fontsize=8)
 noms=list(nfa_au_pic.keys())
 with np.errstate(divide="ignore"):
     vals=[np.log10(nfa_au_pic[n]) for n in noms]
-ax[1].bar(noms,vals,color=["C0","C1"])
+ax[1].bar(noms,vals,color=["C0","C1","C2","C4"])
 ax[1].set_ylabel("log10 NFA au pic (d=100)")
 ax[1].set_title("(b) Force de detection par noyau")
+ax[1].tick_params(axis="x",labelrotation=15)
 
 fig.suptitle("E3 - Effet du noyau d'interpolation (M=100, N=250, L=8, r=20)",fontsize=13)
 fig.subplots_adjust(wspace=0.25,top=0.88)

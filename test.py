@@ -10,13 +10,13 @@ M, N, L, r = 100, 250, 10, 20
 dmax = N - 1
 eps = 1.0
 
-# --- cas 1 : signal rééchantillonné ---
+# cas 1 : signal rééchantillonné 
 u = rng.standard_normal(M)
 v = resample_1d(u, N, kernel_nn)
 rho = patch_correlations_1d(dft(v), L, dmax)
 nfa = compute_nfa(rho, r)
 
-# --- cas 2 : signal NON rééchantillonné (référence) ---
+# cas 2 : signal NON rééchantillonné (référence) 
 w = rng.standard_normal(N)
 rho_ref = patch_correlations_1d(dft(w), L, dmax)
 nfa_ref = compute_nfa(rho_ref, r)
@@ -24,9 +24,6 @@ nfa_ref = compute_nfa(rho_ref, r)
 print("Ree.  : detectees :", decide(nfa, eps))
 print("Ref.  : detectees :", decide(nfa_ref, eps))
 
-# ----------------------------------------------------------------------
-# COURBE NFA(d) — l'equivalent 1D de la Fig. 2 du papier
-# ----------------------------------------------------------------------
 d = np.arange(N)
 
 with np.errstate(divide="ignore"):
