@@ -1,3 +1,7 @@
 numpy
 pytest
 matplotlib
+scipy
+imageio
+tifffile
+pillow
