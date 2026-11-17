@@ -58,3 +58,25 @@ def resample_2d_sep(u, out_shape, kernel):
     tmp=np.array([resample_1d(u[i,:], N2, kernel) for i in range(M1)]) 
     out=np.array([resample_1d(tmp[:,j], N1, kernel) for j in range(N2)]).T  
     return out
+
+# ----------------------------------------------------------------------
+# Version matricielle (rapide) : meme calcul que resample_1d / resample_2d_sep.
+# v_j = sum_k u_k phi(wrap(j M/N - k))  <=>  v = W u  avec W[j,k] = phi(wrap(j M/N - k))
+# En 2D separable : v = W1 @ u @ W2^T.
+# ----------------------------------------------------------------------
+_W_CACHE={}
+
+
+def resampling_matrix(M,N,kernel):
+    """Matrice (N, M) du reechantillonnage periodique M -> N (Eq. 4-5 du papier)."""
+    key=(M,N,kernel)
+    if key not in _W_CACHE:
+        x=np.arange(N)[:,None]*M/N-np.arange(M)[None,:]
+        _W_CACHE[key]=kernel(wrap(x,M))
+    return _W_CACHE[key]
+
+
+def resample_2d_fast(u,out_shape,kernel):
+    """Equivalent exact de resample_2d_sep, en deux produits matriciels."""
+    u=np.asarray(u,dtype=float); M1,M2=u.shape; N1,N2=out_shape
+    return resampling_matrix(M1,N1,kernel)@u@resampling_matrix(M2,N2,kernel).T

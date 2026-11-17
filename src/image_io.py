@@ -78,3 +78,12 @@ def image_info(path):
     """Taille, type et nombre de canaux, sans conversion (utile pour verifier un telechargement)."""
     img=_imread(path)
     return {"shape":img.shape,"dtype":str(img.dtype),"min":float(img.min()),"max":float(img.max())}
+
+
+def save_gray_jpeg(img,path,quality=95):
+    """Sauvegarde en JPEG niveaux de gris 8 bits (compression AVEC perte, facteur de qualite donne)."""
+    img=np.asarray(img,dtype=np.float64)
+    if img.ndim!=2:
+        raise ValueError("image 2D attendue")
+    os.makedirs(os.path.dirname(os.path.abspath(path)),exist_ok=True)
+    Image.fromarray(np.clip(np.round(img),0,255).astype(np.uint8),mode="L").save(path,quality=int(quality))
