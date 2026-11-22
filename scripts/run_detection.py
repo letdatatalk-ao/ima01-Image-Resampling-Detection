@@ -14,9 +14,9 @@ import argparse, csv, os, sys, time
 from multiprocessing import Pool
 from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.detector import detect, matches
+from src.detector import detect, matches, harmonic_distances
 
-COLS = ["id", "label", "kernel", "q", "format", "path", "detected", "correct_d", "log10_nfa",
+COLS = ["id", "label", "kernel", "q", "format", "path", "detected", "correct_d", "correct_d_harm", "log10_nfa", "log10_nfa_nocv",
         "d1", "d2", "d_v", "d_h", "best_v", "best_h", "seconds"]
 
 
@@ -31,8 +31,11 @@ def run_one(job):
     exp = [float(row["d1"]), float(row["d2"])] if row["label"] == "resampled" else []
     dv, dh = [int(x) for x in o["d_v"]], [int(x) for x in o["d_h"]]
     ok = (matches(dv, exp) or matches(dh, exp)) if exp else ""
+    harm = harmonic_distances(float(row["q"]), o["size"][0]) if exp else []
+    okh = (matches(dv, harm) or matches(dh, harm)) if exp else ""
     return {**{k: row[k] for k in ["id", "label", "kernel", "q", "format", "path", "d1", "d2"]},
-            "detected": o["detected"], "correct_d": ok, "log10_nfa": round(o["log10_nfa"], 2),
+            "detected": o["detected"], "correct_d": ok, "correct_d_harm": okh,
+            "log10_nfa": round(o["log10_nfa"], 2), "log10_nfa_nocv": round(o["log10_nfa_nocv"], 2),
             "d_v": " ".join(map(str, dv)), "d_h": " ".join(map(str, dh)),
             "best_v": o["best_v"][0], "best_h": o["best_h"][0], "seconds": round(time.time() - t0, 2)}
 
@@ -69,8 +72,10 @@ def main():
     ap.add_argument("--data", default="data/raise_prepared")
     ap.add_argument("--format", default="png", choices=["png", "jpeg95", "jpeg90"])
     ap.add_argument("--kernel", default=None, help="un seul noyau (defaut : tous)")
-    ap.add_argument("--residual", default="rt", choices=["rt", "tv", "none"])
-    ap.add_argument("--s", type=int, default=3, help="demi-fenetre du rank transform (3 -> 7x7)")
+    ap.add_argument("--residual", default=None, choices=["rt", "tv", "none"],
+                    help="defaut : rt (7x7) pour PNG, tv pour JPEG, comme le papier (Sec. IV)")
+    ap.add_argument("--s", type=int, default=None, help="demi-fenetre du rank transform (defaut 3 en PNG, 1 en JPEG)")
+    ap.add_argument("--no-jpeg-suppression", action="store_true", help="desactive la suppression des pics kN/8 (Sec. III-C)")
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
@@ -78,14 +83,17 @@ def main():
     with open(os.path.join(a.data, "index.csv"), newline="", encoding="utf-8") as f:
         idx = [r for r in csv.DictReader(f) if r["format"] == a.format
                and (a.kernel is None or r["label"] == "original" or r["kernel"] == a.kernel)]
-    out = a.out or f"results/detection_{a.format}_{a.residual}.csv"
+    is_jpeg = a.format.startswith("jpeg")
+    a.residual = a.residual or ("tv" if is_jpeg else "rt")
+    a.s = a.s if a.s is not None else (1 if is_jpeg else 3)
+    params = {"residual": a.residual, "s": a.s, "jpeg": is_jpeg and not a.no_jpeg_suppression}
+    out = a.out or f"results/final/detection_{a.format}_{a.residual}{'' if params['jpeg'] or not is_jpeg else '_nosupp'}.csv"
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     done = {}
     if os.path.exists(out):
         with open(out, newline="", encoding="utf-8") as f:
             done = {r["path"]: r for r in csv.DictReader(f)}
     todo = [r for r in idx if r["path"] not in done]
-    params = {"residual": a.residual, "s": a.s}
     print(f"{len(idx)} images ({a.format}), {len(done)} deja faites, {len(todo)} a traiter -> {out}")
 
     t0 = time.time()

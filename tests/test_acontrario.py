@@ -28,3 +28,22 @@ def test_vrai_negatif_avec_seuil_resserre():
     nfa_ref = compute_nfa(rho_ref, r)
     detections = decide(nfa_ref, eps=1e-3)
     assert len(detections) == 0
+
+def test_jpeg_distances_600():
+    from src.acontrario import jpeg_distances
+    assert jpeg_distances(600)==[75,150,225,300,375,450,525]
+
+
+def test_suppression_jpeg_invalide_le_pic_et_son_voisinage():
+    """Un pic a d*=75 est invalide jusqu'au 2e minimum local de chaque cote (Sec. III-C)."""
+    from src.acontrario import jpeg_valid_mask
+    x=np.random.default_rng(0).random(200)*0.1; x[75]=1.0
+    v=jpeg_valid_mask(x,[75])
+    assert not v[75] and v[0] and v[199]
+    assert v.sum()<200-3
+
+
+def test_votes_sans_exclusion_inchanges():
+    from src.acontrario import count_votes
+    rho=np.random.default_rng(1).random((30,120))
+    assert np.array_equal(count_votes(rho,10,None),count_votes(rho,10,[]))

@@ -1,7 +1,8 @@
 numpy
-pytest
-matplotlib
 scipy
+matplotlib
+pandas
 imageio
 tifffile
 pillow
+pytest
