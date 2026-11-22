@@ -6,7 +6,8 @@ Exemples (depuis code_ima) :
     python scripts/run_detection.py --format jpeg90 --s 1    # plus tard, apres l'exclusion JPEG
 
 Sorties :
-    results/detection_<format>.csv : une ligne par image (decision, distances, NFA, bon d ?)
+    results/corrige/detection_<format>_<residu>.csv : une ligne par image (decision, distances, NFA, bon d ?)
+    (avec --papier : results/final/..., tous les patches comme dans le papier)
     resume affiche : faux positifs sur les originales, taux de detection par noyau et facteur q
 Les images deja traitees (presentes dans le CSV de resultats) sont sautees.
 """
@@ -54,7 +55,8 @@ def summary(rows):
     if not res:
         return
     kernels = sorted({k for k, _ in res}); qs = sorted({q for _, q in res})
-    for title, key in [("Taux de detection (%)", "detected"), ("Detection au BON d (%)", "correct_d")]:
+    for title, key in [("Taux de detection (%)", "detected"), ("Detection au BON d (%)", "correct_d"),
+                       ("Detection au bon d, harmoniques incluses (%)", "correct_d_harm")]:
         print(f"\n{title}")
         print("noyau    " + "".join(f"{q:>7.1f}" for q in qs))
         for k in kernels:
@@ -76,6 +78,9 @@ def main():
                     help="defaut : rt (7x7) pour PNG, tv pour JPEG, comme le papier (Sec. IV)")
     ap.add_argument("--s", type=int, default=None, help="demi-fenetre du rank transform (defaut 3 en PNG, 1 en JPEG)")
     ap.add_argument("--no-jpeg-suppression", action="store_true", help="desactive la suppression des pics kN/8 (Sec. III-C)")
+    ap.add_argument("--jpeg-block", type=int, default=8, help="distances JPEG exclues kN/block : 8 = papier, 16 = code des auteurs")
+    ap.add_argument("--papier", action="store_true",
+                    help="tous les patches comme le papier (defaut : un patch par paire conjuguee, votes independants)")
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
@@ -86,8 +91,9 @@ def main():
     is_jpeg = a.format.startswith("jpeg")
     a.residual = a.residual or ("tv" if is_jpeg else "rt")
     a.s = a.s if a.s is not None else (1 if is_jpeg else 3)
-    params = {"residual": a.residual, "s": a.s, "jpeg": is_jpeg and not a.no_jpeg_suppression}
-    out = a.out or f"results/final/detection_{a.format}_{a.residual}{'' if params['jpeg'] or not is_jpeg else '_nosupp'}.csv"
+    params = {"residual": a.residual, "s": a.s, "jpeg": is_jpeg and not a.no_jpeg_suppression, "hermitien": not a.papier, "jpeg_block": a.jpeg_block}
+    base = "results/final" if a.papier else "results/corrige"
+    out = a.out or f"{base}/detection_{a.format}_{a.residual}{'' if params['jpeg'] or not is_jpeg else '_nosupp'}{'_b%d' % a.jpeg_block if a.jpeg_block != 8 else ''}.csv"
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     done = {}
     if os.path.exists(out):

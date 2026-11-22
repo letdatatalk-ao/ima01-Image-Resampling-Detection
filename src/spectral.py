@@ -162,3 +162,17 @@ def patch_correlations_2d(spectrum, patch_shape=None, patch_ratio=10,
         rho_H=corr(F, (h,w), dmax_H, axis=1)
     return rho_V, rho_H, (h,w)
 
+
+def hermitian_half(rho_V, rho_H, shape, patch_shape):
+    """Votes independants (controle des fausses alarmes, Sec. III-B).
+    Image reelle -> spectre hermitien : F(-u,-v)=conj F(u,v). Pour un decalage vertical d, le couple
+    (P, P+d) a un jumeau conjugue (-(P+d), -P) au meme d, situe dans les colonnes opposees : ses votes
+    sont des copies. On ne garde donc que les patches des colonnes 0..W/2 pour rho_V et des lignes
+    0..H/2 pour rho_H (le jumeau tombe toujours dans l'autre moitie). Mesure sur bruit blanc
+    (experiences/exp_h0_bruit.py) : surdispersion des votes 1.29 -> 1.00, E[#FA] 1.75 -> 0.8 <= eps."""
+    H,W=shape; h,w=patch_shape
+    npr,npc=H//h, W//w
+    keep_V=[i*npc+j for i in range(npr) for j in range(npc//2)]
+    keep_H=[i*npc+j for i in range(npr//2) for j in range(npc)]
+    return rho_V[keep_V], rho_H[keep_H]
+

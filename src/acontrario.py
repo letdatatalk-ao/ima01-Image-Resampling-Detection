@@ -92,11 +92,12 @@ def cross_validate(nfa_1,nfa_2,N1,N2,beta=0.005):
     return valid
 
 
-def detect_2d(rho_v,rho_h,H,W,r=20,beta=0.005,eps=1.0,cross_val=True,jpeg=False):
+def detect_2d(rho_v,rho_h,H,W,r=20,beta=0.005,eps=1.0,cross_val=True,jpeg=False,jpeg_block=8):
     """rho_v : decalages verticaux (d<H), rho_h : horizontaux (d<W). dmax doit valoir H-1 / W-1.
-    jpeg=True : suppression des distances JPEG kN/8 avant le comptage des votes (Sec. III-C)."""
-    nfa_v=compute_nfa(rho_v,r,jpeg_distances(H) if jpeg else None)
-    nfa_h=compute_nfa(rho_h,r,jpeg_distances(W) if jpeg else None)
+    jpeg=True : suppression des distances JPEG kN/8 avant le comptage des votes (Sec. III-C).
+    jpeg_block=8 : texte du papier (kN/8) ; 16 : code des auteurs (kN/16)."""
+    nfa_v=compute_nfa(rho_v,r,jpeg_distances(H,jpeg_block) if jpeg else None)
+    nfa_h=compute_nfa(rho_h,r,jpeg_distances(W,jpeg_block) if jpeg else None)
     if cross_val:
         nfa_v_cv=cross_validate(nfa_v,nfa_h,H,W,beta)
         nfa_h_cv=cross_validate(nfa_h,nfa_v,W,H,beta)
