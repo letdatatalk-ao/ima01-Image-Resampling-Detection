@@ -1,4 +1,4 @@
-"""Controle des fausses alarmes sous H0 : bruit blanc 600x600, aucun reechantillonnage.
+"""Limite du controle des fausses alarmes (rapport Section 7) : bruit blanc 600x600, aucun reechantillonnage.
 Theorie (Sec. III-B) : si les votes des patches sont independants, k(d) ~ B(#P, 1/(2r+1)) et
 E[#{d : NFA(d) < eps}] <= eps par axe.  Spectre hermitien -> chaque couple (P, P+d) a un jumeau
 conjugue : avec tous les patches (papier) les votes sont redondants. src.spectral.hermitian_half

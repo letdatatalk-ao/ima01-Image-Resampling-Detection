@@ -1,0 +1,3 @@
+50 images de bruit blanc 600x600, rank transform 7x7, r=20, eps=1.0
+papier   #P=100 | E[#FA] par axe = 1.72 (theorie <= 1) | surdispersion des votes = 1.28 (binomiale = 1) | images avec >=1 FA sans val. croisee = 96 % | avec val. croisee = 2 %
+corrige  #P= 50 | E[#FA] par axe = 0.88 (theorie <= 1) | surdispersion des votes = 1.00 (binomiale = 1) | images avec >=1 FA sans val. croisee = 76 % | avec val. croisee = 0 %

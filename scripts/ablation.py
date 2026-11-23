@@ -1,4 +1,4 @@
-"""Ablation de l'extraction du residu (Table IX du papier) : precision (%) a 1 % de faux positifs,
+"""Ablation de l'extraction du residu (rapport Table 6) : precision (%) a 1 % de faux positifs,
 noyau bicubique, pour chaque residu disponible dans results/final/detection_<format>_<residu>.csv.
 
 Prealable (exemple PNG) :

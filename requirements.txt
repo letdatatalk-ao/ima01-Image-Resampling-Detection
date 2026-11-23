@@ -3,6 +3,6 @@ scipy
 matplotlib
 pandas
 imageio
-tifffile
 pillow
+tifffile
 pytest

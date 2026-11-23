@@ -1,13 +1,16 @@
 """Tests de la theorie (Theoreme 1) et du controle des fausses alarmes."""
 import numpy as np
-from src.resampling import kernel_nn, linear_kernel, resample_1d, resample_2d_fast, resample_2d_sep
+from src.resampling import kernel_nn, linear_kernel, resample_1d, resample_2d, resample_2d_fast, resample_2d_sep
 from src.acontrario import compute_nfa
 
 
 def test_fast_egal_separable():
-    """resample_2d_fast (produit matriciel) == resample_2d_sep (boucles), noyau lineaire."""
+    """resample_2d_fast (produit matriciel) == resample_2d_sep (lignes puis colonnes) == resample_2d (double somme)."""
     u = np.random.default_rng(0).standard_normal((12, 15))
     assert np.allclose(resample_2d_fast(u, (17, 11), linear_kernel), resample_2d_sep(u, (17, 11), linear_kernel), atol=1e-12)
+    assert np.allclose(resample_2d_fast(u, (17, 11), linear_kernel), resample_2d(u, (17, 11), linear_kernel), atol=1e-12)
+    # q = 1 : le noyau vaut 1 en 0 et 0 aux autres entiers, donc l'image est rendue telle quelle
+    assert np.allclose(resample_2d_fast(u, u.shape, linear_kernel), u, atol=1e-12)
 
 
 def test_theoreme1_copie_spectrale():
