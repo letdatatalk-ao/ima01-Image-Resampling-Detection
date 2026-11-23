@@ -1,18 +1,20 @@
-"""Taux de detection (%) a 1 % de faux positifs, noyau bicubique (rapport Tables 4 et 5).
+"""Reproduction de la Table IV du papier : precision de detection (%) a 1 % de faux positifs.
 
 Pour chaque format (PNG, JPEG 95, JPEG 90) :
-  1. seuil calibre sur les ORIGINALES : t = valeur de log10 NFA de rang floor(0.01 n),
-     une image est detectee si log10 NFA < t (donc au plus 1 % d'originales detectees) ;
-  2. taux de detection des images reechantillonnees, pour chaque facteur q ;
-  3. avec validation croisee (colonne log10_nfa) et sans (log10_nfa_nocv).
-Usage (depuis code_ima) :  python scripts/table4.py [--dir results/final] [--kernel cubic]
+  1. le seuil est calibre sur les ORIGINALES : on garde 1 % de faux positifs
+     (seuil t = la valeur de log10 NFA de rang floor(0.01 n), detection si log10 NFA < t) ;
+  2. on mesure le taux de detection des images reechantillonnees (noyau bicubique par defaut) par facteur q ;
+  3. avec validation croisee (log10_nfa) et sans (log10_nfa_nocv), comme les deux lignes du papier.
+
+Usage (depuis code_ima) :  python scripts/table4.py [--kernel cubic] [--dir results/final]
+Sorties : results/final/table4.csv et un tableau affiche avec les valeurs du papier.
 """
-import argparse, os
+import argparse, os, sys
 import numpy as np
 import pandas as pd
 
 QS = [0.6, 0.7, 0.8, 0.9, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6]
-# valeurs publiees par les auteurs (Table IV, noyau bicubique) ; None = facteur ignore en JPEG
+# Table IV du papier (bicubique) : "Ours" (sans validation croisee) et "Ours, cross-val."
 PAPER = {
     "png":    {"nocv": [93.1, 99.9, 100.0, 99.8, 99.7, 99.9, 99.8, 99.8, 99.8, 99.8],
                "cv":   [98.1, 100.0, 99.9, 99.9, 100.0, 99.9, 100.0, 99.9, 100.0, 100.0]},
@@ -30,12 +32,6 @@ def threshold_1pct(scores):
     return s[int(np.floor(0.01 * len(s)))]
 
 
-def fmt_row(name, values):
-    cells = "".join(f"{x:7.1f}" if x is not None and not np.isnan(x) else "      -" for x in values)
-    ok = [x for x in values if x is not None and not np.isnan(x)]
-    return f"     {name:7s}{cells}   {np.mean(ok):6.1f}"
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dir", default="results/final")
@@ -49,23 +45,36 @@ def main():
             continue
         r = pd.read_csv(p)
         r = r[r["detected"].astype(str) != "ERROR"]
-        orig = r[r["label"] == "original"]
-        res = r[(r["label"] == "resampled") & (r["kernel"] == a.kernel)]
-        fp = 100 * (orig["detected"].astype(str) == "True").mean()
-        print(f"\n=== {fmt.upper()}  ({len(orig)} originales)  faux positifs a eps=1 : {fp:.1f} %")
-        for mode, col in [("cv", "log10_nfa"), ("nocv", "log10_nfa_nocv")]:
-            t = threshold_1pct(orig[col])
-            acc = [100 * (res[res["q"] == q][col] < t).mean() if (res["q"] == q).any() else np.nan for q in QS]
-            if fmt != "png":                         # 0.8 et 1.6 tombent sur la grille JPEG kN/8
-                acc = [np.nan if p_ is None else x for x, p_ in zip(acc, PAPER[fmt][mode])]
-            print(f"  {'avec' if mode == 'cv' else 'sans'} validation croisee, seuil log10 NFA < {t:.2f}")
+        o = r[r["label"] == "original"]; s = r[(r["label"] == "resampled") & (r["kernel"] == a.kernel)]
+        n0 = len(o)
+        fp_eps1 = 100 * (o["detected"].astype(str) == "True").mean()
+        print(f"\n=== {fmt.upper()}  ({n0} originales, {s['id'].nunique()} photos)  faux positifs a eps=1 : {fp_eps1:.1f} %")
+        print("  faux positifs des originales selon eps (calibration H0 en 2D) :")
+        for col, lab in [("log10_nfa", "notre c.v."), ("log10_nfa_h", "H seul    ")]:
+            if col in o:
+                print("     " + lab + "  " + "  ".join(f"eps=1e{e}: {100 * (o[col] < e).mean():5.1f}%" for e in (0, -1, -2, -3)))
+        variants = [("nocv", "log10_nfa_h", "H seul, sans c.v. (= ligne 'Ours')"),
+                    ("cv", "log10_nfa_cv_authors", "c.v. des auteurs (= 'Ours, cross-val.')"),
+                    ("cv", "log10_nfa", "notre c.v. symetrique"),
+                    ("nocv", "log10_nfa_nocv", "2 axes sans c.v.")]
+        for mode, col, label in variants:
+            if col not in r:
+                print(f"  colonne {col} absente (relancez run_detection.py)"); continue
+            t = threshold_1pct(o[col])
+            acc = [100 * (s[s["q"] == q][col] < t).mean() if (s["q"] == q).any() else np.nan for q in QS]
+            pap = PAPER[fmt][mode]
+            print(f"  {label} -- seuil 1% : log10 NFA < {t:.2f}  (eps = {10 ** t:.1e})")
             print("     q      " + "".join(f"{q:>7.1f}" for q in QS) + "   moyenne")
-            print(fmt_row("nous", acc)); print(fmt_row("papier", PAPER[fmt][mode]))
-            for q, x, y in zip(QS, acc, PAPER[fmt][mode]):
-                rows.append({"format": fmt, "mode": mode, "q": q, "ours": None if np.isnan(x) else round(x, 1),
-                             "paper": y, "threshold_log10": round(t, 3), "n_originals": len(orig)})
+            ok = [x for x in acc if not np.isnan(x)]
+            print("     nous   " + "".join(f"{x:7.1f}" if not np.isnan(x) else "      -" for x in acc) + f"   {np.mean(ok):6.1f}")
+            pk = [x for x in pap if x is not None]
+            print("     papier " + "".join(f"{x:7.1f}" if x is not None else "      -" for x in pap) + f"   {np.mean(pk):6.1f}")
+            for q, x, y in zip(QS, acc, pap):
+                rows.append({"format": fmt, "variant": col, "mode": mode, "q": q, "ours": None if np.isnan(x) else round(x, 1), "paper": y,
+                             "threshold_log10": round(t, 3), "n_originals": n0})
     if rows:
         out = os.path.join(a.dir, "table4.csv"); pd.DataFrame(rows).to_csv(out, index=False); print(f"\n-> {out}")
+    print("\nNote : en JPEG, le papier ignore q=0.8 et q=1.6 : 600/0.8 mod 600 = 150 et 600/1.6 = 375 tombent sur des distances JPEG kN/8.")
 
 
 if __name__ == "__main__":

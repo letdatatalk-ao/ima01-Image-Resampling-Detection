@@ -1,4 +1,4 @@
-"""Lecture d'images reelles (rapport Section 6.3) (PNG, JPEG, TIFF 8/16 bits) et conversion en luminance.
+"""Lecture d'images reelles (PNG, JPEG, TIFF 8/16 bits) et conversion en luminance.
 Convention : toutes les images sont rendues en float64 sur l'echelle [0, 255],
 pour etre compatibles avec le rank transform et le TV (lambda=1 sur [0,255])."""
 import os

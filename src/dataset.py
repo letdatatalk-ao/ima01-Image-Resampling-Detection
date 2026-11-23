@@ -1,5 +1,5 @@
-"""Preparation du jeu de test RAISE (rapport Section 6.3, protocole de la Sec. IV-A du papier).
-TIFF -> luminance -> x1/2 (moyenne 2x2) -> (reechantillonnage x q) -> recadrage central 600 x 600."""
+"""Preparation du jeu de test a partir de RAISE (protocole de la Sec. IV-A du papier).
+TIFF -> luminance -> sous-echantillonnage x1/2 -> (reechantillonnage xq) -> recadrage central N x N."""
 import numpy as np
 from src.resampling import resample_2d_fast, kernel_nn, linear_kernel, cubic_kernel, lanczos_kernel
 
@@ -19,7 +19,6 @@ def downsample2(img):
 
 
 def center_crop(img,size):
-    """Carre central size x size."""
     h,w=img.shape
     if h<size or w<size:
         raise ValueError(f"image {h}x{w} trop petite pour un recadrage {size}x{size}")
